@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>تتبع شحنتك</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+  :root {
+    --bg: #101613; --surface: #171F1B; --surface-2: #1E2822; --surface-3: #26332B; --border: #2E3B33;
+    --text: #EAEFE9; --text-muted: #8FA096;
+    --accent: #D9A441; --accent-soft: rgba(217,164,65,0.16);
+    --green: #5FBF8F; --green-soft: rgba(95,191,143,0.14);
+    --danger: #E06B6B; --danger-soft: rgba(224,107,107,0.14);
+    --blue: #6FA8DC; --blue-soft: rgba(111,168,220,0.14);
+    --font: 'Cairo','Tahoma',sans-serif; --mono: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg:#F5F3EE; --surface:#FFFFFF; --surface-2:#FBFAF6; --surface-3:#F1EEE6; --border:#DFDACD;
+      --text:#20261F; --text-muted:#6B7364;
+    }
+  }
+  * { box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{ background:var(--bg); color:var(--text); font-family:var(--font); min-height:100vh; -webkit-font-smoothing:antialiased; display:flex; align-items:center; justify-content:center; padding:20px; }
+  button{ font-family:var(--font); cursor:pointer; }
+  input{ font-family:var(--font); }
+
+  .wrap{ width:100%; max-width:440px; }
+  .card{ background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:30px 26px; }
+  .logo{ width:56px; height:56px; border-radius:14px; margin:0 auto 14px; display:flex; align-items:center; justify-content:center; background:linear-gradient(155deg,var(--accent),#B9822B); overflow:hidden; }
+  .logo img{ width:100%; height:100%; object-fit:contain; background:#fff; }
+  .logo svg{ width:28px; height:28px; }
+  h1{ text-align:center; font-size:19px; margin:0 0 4px; }
+  .sub{ text-align:center; font-size:12.5px; color:var(--text-muted); margin-bottom:24px; }
+  .field{ display:flex; gap:8px; }
+  .field input{ flex:1; background:var(--surface-2); border:1px solid var(--border); color:var(--text); padding:13px 14px; border-radius:10px; font-size:15px; font-family:var(--mono); text-align:center; letter-spacing:1px; }
+  .btn{ background:var(--accent); border:none; color:#241705; font-weight:800; font-size:14px; padding:13px 20px; border-radius:10px; white-space:nowrap; }
+  .btn:hover{ filter:brightness(1.07); }
+  .btn:disabled{ opacity:0.6; }
+  .msg{ margin-top:14px; font-size:13px; text-align:center; color:var(--text-muted); }
+  .msg.error{ color:var(--danger); }
+
+  .result{ margin-top:22px; border-top:1px solid var(--border); padding-top:20px; display:none; }
+  .result.show{ display:block; }
+  .track-num{ font-family:var(--mono); font-size:20px; font-weight:800; text-align:center; letter-spacing:1px; margin-bottom:12px; }
+  .badge{ display:flex; align-items:center; justify-content:center; gap:8px; padding:10px; border-radius:10px; font-weight:800; font-size:14px; margin-bottom:16px; }
+  .dot{ width:8px; height:8px; border-radius:50%; }
+  .row{ display:flex; justify-content:space-between; padding:9px 0; border-bottom:1px dashed var(--border); font-size:13px; }
+  .row:last-child{ border-bottom:none; }
+  .row .k{ color:var(--text-muted); }
+  .row .v{ font-weight:700; }
+  .footer{ text-align:center; font-size:11px; color:var(--text-muted); margin-top:20px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <div class="logo" id="logoBox"><svg viewBox="0 0 24 24" fill="none"><path d="M3 12l7-8 4 4-7 8-4-4z" stroke="#241705" stroke-width="1.8" stroke-linejoin="round"/><path d="M13 9l3-3 5 5-3 3" stroke="#241705" stroke-width="1.8" stroke-linejoin="round"/></svg></div>
+    <h1 id="companyName">تتبع شحنتك</h1>
+    <div class="sub">اكتب رقم التتبع لمعرفة حالة شحنتك الآن</div>
+    <div class="field">
+      <input id="trackingInput" placeholder="مثال: KSA-SD-205" autocomplete="off">
+      <button class="btn" id="trackBtn" onclick="track()">تتبع</button>
+    </div>
+    <div class="msg" id="msg"></div>
+    <div class="result" id="result"></div>
+  </div>
+  <div class="footer">هذه الصفحة للاطلاع على حالة الشحنة فقط</div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://ngufhuuhrspschvtvrun.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5ndWZodXVocnNwc2NodnR2cnVuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1NTE5NzAsImV4cCI6MjEwNTEyNzk3MH0.HnPuuQzv6iQTxSC_3ODP01ufKzclhUcTzPMEXkb8ajE';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const STATUS = {
+  preparing:   { label:'قيد التجهيز',      color:'var(--text-muted)', soft:'var(--surface-3)' },
+  shipped:     { label:'غادرت على الشاحنة', color:'var(--blue)',  soft:'var(--blue-soft)' },
+  customs:     { label:'في الجمارك',        color:'var(--accent)',soft:'var(--accent-soft)' },
+  arrived:     { label:'وصلت السودان',      color:'var(--green)', soft:'var(--green-soft)' },
+  delivered:   { label:'تم التسليم',        color:'var(--green)', soft:'var(--green-soft)' },
+  cancelled:   { label:'ملغاة',             color:'var(--danger)',soft:'var(--danger-soft)' },
+};
+function fmtDate(iso){ if(!iso) return '—'; const d=new Date(iso); return d.toLocaleDateString('ar-SA',{month:'short',day:'numeric',year:'numeric'}); }
+function fmtDateTime(iso){ if(!iso) return '—'; const d=new Date(iso); return d.toLocaleDateString('ar-SA',{month:'short',day:'numeric'}) + ' ' + d.toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'}); }
+
+async function loadBranding(){
+  try{
+    const { data, error } = await sb.rpc('get_company_info');
+    if (error || !data || !data.length) return;
+    const c = data[0];
+    if (c.name) document.getElementById('companyName').textContent = c.name;
+    if (c.logo_url){
+      document.getElementById('logoBox').innerHTML = `<img src="${c.logo_url}">`;
+    }
+  } catch(e){}
+}
+loadBranding();
+
+async function track(){
+  const val = document.getElementById('trackingInput').value.trim();
+  const msg = document.getElementById('msg');
+  const result = document.getElementById('result');
+  const btn = document.getElementById('trackBtn');
+  msg.textContent=''; msg.classList.remove('error'); result.classList.remove('show');
+  if (!val){ msg.textContent='اكتب رقم التتبع أولًا'; msg.classList.add('error'); return; }
+  btn.disabled = true; btn.textContent = 'جارِ البحث...';
+  try{
+    const { data, error } = await sb.rpc('track_shipment', { p_tracking: val });
+    btn.disabled = false; btn.textContent = 'تتبع';
+    if (error){ msg.textContent='حصل خطأ، حاول مرة أخرى'; msg.classList.add('error'); return; }
+    if (!data || !data.length){ msg.textContent='لم يتم العثور على شحنة بهذا الرقم — تأكد من كتابته صح'; msg.classList.add('error'); return; }
+    const s = data[0];
+    const st = STATUS[s.status] || STATUS.preparing;
+    result.innerHTML = `
+      <div class="track-num">${s.tracking}</div>
+      <div class="badge" style="background:${st.soft};color:${st.color}"><span class="dot" style="background:${st.color}"></span>${st.label}</div>
+      <div class="row"><span class="k">المدينة</span><span class="v">${s.city||'—'}</span></div>
+      <div class="row"><span class="k">الوصول المتوقع</span><span class="v">${s.eta?fmtDate(s.eta):'غير محدد'}</span></div>
+      <div class="row"><span class="k">تاريخ التسجيل</span><span class="v">${fmtDateTime(s.created_at)}</span></div>
+      ${s.delivered_at ? `<div class="row"><span class="k">تاريخ التسليم</span><span class="v">${fmtDateTime(s.delivered_at)}</span></div>` : ''}
+      ${s.trip_number ? `<div class="row"><span class="k">رقم الرحلة</span><span class="v" style="font-family:var(--mono);">${s.trip_number}</span></div>` : ''}
+    `;
+    result.classList.add('show');
+  } catch(e){
+    btn.disabled = false; btn.textContent = 'تتبع';
+    msg.textContent='حصل خطأ في الاتصال، حاول مرة أخرى'; msg.classList.add('error');
+  }
+}
+document.getElementById('trackingInput').addEventListener('keydown', e=>{ if(e.key==='Enter') track(); });
+</script>
+</body>
+</html>
