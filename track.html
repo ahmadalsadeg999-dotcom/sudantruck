@@ -133,6 +133,16 @@ async function track(){
   }
 }
 document.getElementById('trackingInput').addEventListener('keydown', e=>{ if(e.key==='Enter') track(); });
+
+/* Auto-fill from ?t=TRACKING_NUMBER in the URL */
+(function(){
+  const params = new URLSearchParams(window.location.search);
+  const t = params.get('t');
+  if (t){
+    document.getElementById('trackingInput').value = t;
+    track();
+  }
+})();
 </script>
 </body>
 </html>
